@@ -1,4 +1,5 @@
 import os
+from typing import Callable, Awaitable, Any
 from functools import lru_cache
 
 from dotenv import load_dotenv
@@ -16,17 +17,9 @@ MODELS = [
 ]
 
 
+# Загрузка промпта для указанного модуля (formalizer, explainer)
 @lru_cache(maxsize=3)
 def _get_prompt(module: str) -> str:
-    """
-    Загружает промпт для указанного модуля.
-    
-    Args:
-        module: 'formalizer', 'explainer'
-    
-    Returns:
-        Текст промпта
-    """
     prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
     prompt_path = os.path.join(prompts_dir, f"{module}.txt")
     try:
@@ -36,24 +29,23 @@ def _get_prompt(module: str) -> str:
         raise RuntimeError(f"Промпт для модуля '{module}' не найден: {prompt_path}")
 
 
+# Загрузка системного промпта (legacy, для обратной совместимости)
 @lru_cache(maxsize=1)
 def _get_system_prompt() -> str:
-    """Load system prompt from file (legacy, для обратной совместимости)."""
     prompt_path = os.path.join(os.path.dirname(__file__), "system_prompt.txt")
     try:
         with open(prompt_path, "r", encoding="utf-8") as f:
             return f.read().strip()
     except FileNotFoundError:
-        # Fallback на очень простой системный промпт
         return (
             "You are a helpful assistant answering in Russian by default. "
             "Give concise and clear answers."
         )
 
 
+# Создание клиента OpenAI для работы с OpenRouter
 @lru_cache(maxsize=1)
 def _get_client() -> AsyncOpenAI:
-    """Create AsyncOpenAI client configured for OpenRouter."""
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set in environment")
@@ -64,12 +56,8 @@ def _get_client() -> AsyncOpenAI:
     )
 
 
+# Вызов LLM с механизмом fallback (если одна модель не работает, пробует следующую)
 async def _call_llm(system_prompt: str, user_text: str, user_id: str | None = None) -> str:
-    """
-    Вспомогательная функция для вызова LLM.
-    
-    Использует механизм fallback: если одна модель не работает, пробует следующую.
-    """
     client = _get_client()
 
     messages = [
@@ -112,76 +100,43 @@ async def _call_llm(system_prompt: str, user_text: str, user_id: str | None = No
     raise RuntimeError("Список моделей пуст")
 
 
+# Модуль 1: Формализатор - преобразует текст задачи в формулы логики предикатов
 async def module1_formalize(user_text: str, user_id: str | None = None) -> str:
-    """
-    Модуль 1: Формализатор.
-    
-    Преобразует текст задачи на естественном языке в набор формул логики предикатов.
-    
-    Returns:
-        Строка с формулами, разделенными запятыми
-    """
     system_prompt = _get_prompt("formalizer")
     return await _call_llm(system_prompt, user_text, user_id)
 
 
+# Модуль 2: Движок резолюций - выполняет алгоритм резолюций для поиска противоречия
 async def module2_resolve(formulas_str: str) -> tuple[bool, list[str]]:
-    """
-    Модуль 2: Движок резолюций.
-    
-    Принимает строку с формулами, разделенными запятыми.
-    Выполняет алгоритм резолюций для поиска противоречия.
-    
-    Returns:
-        Кортеж (найдено_противоречие, лог_шагов)
-    """
-    # Парсим формулы (разделяем по запятым)
     formulas = [f.strip() for f in formulas_str.split(',') if f.strip()]
     return resolution_proof(formulas)
 
 
+# Модуль 3: Объяснятор - преобразует формальный лог доказательства в понятное объяснение
 async def module3_explain(proof_log: list[str], user_id: str | None = None) -> str:
-    """
-    Модуль 3: Объяснятор.
-    
-    Преобразует формальный лог шагов доказательства в понятное объяснение на русском.
-    
-    Args:
-        proof_log: Список строк с логом шагов доказательства
-        user_id: ID пользователя (для метаданных)
-    
-    Returns:
-        Текст объяснения на русском языке
-    """
     system_prompt = _get_prompt("explainer")
     log_text = "\n".join(proof_log)
     return await _call_llm(system_prompt, log_text, user_id)
 
 
-async def full_pipeline(user_text: str, user_id: str | None = None) -> dict[str, str | list[str] | bool]:
-    """
-    Полный пайплайн: Модуль 1 → Модуль 2 → Модуль 3.
-    
-    Args:
-        user_text: Текст задачи на естественном языке
-        user_id: ID пользователя
-    
-    Returns:
-        Словарь с результатами всех модулей:
-        {
-            'formalized': str,      # Результат Модуля 1
-            'proof_found': bool,    # Результат Модуля 2
-            'proof_log': list[str], # Лог шагов Модуля 2
-            'explanation': str      # Результат Модуля 3
-        }
-    """
-    # Модуль 1: Формализация
+# Полный пайплайн: Модуль 1 → Модуль 2 → Модуль 3
+async def full_pipeline(
+    user_text: str, 
+    user_id: str | None = None,
+    progress_callback: Callable[[str], Awaitable[Any]] | None = None
+) -> dict[str, str | list[str] | bool]:
+    if progress_callback:
+        await progress_callback("🔷 Модуль 1: Формализация задачи...")
     formalized = await module1_formalize(user_text, user_id)
     
     # Модуль 2: Резолюции
+    if progress_callback:
+        await progress_callback("🔷 Модуль 2: Выполнение доказательства...")
     proof_found, proof_log = await module2_resolve(formalized)
     
     # Модуль 3: Объяснение
+    if progress_callback:
+        await progress_callback("🔷 Модуль 3: Формирование объяснения...")
     explanation = await module3_explain(proof_log, user_id)
     
     return {
@@ -192,12 +147,8 @@ async def full_pipeline(user_text: str, user_id: str | None = None) -> dict[str,
     }
 
 
-# Обратная совместимость
+# Legacy функция для обратной совместимости (использует полный пайплайн)
 async def generate_reply(user_text: str, user_id: str | None = None) -> str:
-    """
-    Legacy функция для обратной совместимости.
-    Теперь использует полный пайплайн.
-    """
     result = await full_pipeline(user_text, user_id)
     return result['explanation']
 

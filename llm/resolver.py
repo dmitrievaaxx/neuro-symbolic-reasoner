@@ -1,31 +1,18 @@
-"""
-Модуль 2: Движок резолюций для логики предикатов.
-
-Реализует алгоритм резолюций с унификацией для поиска противоречия.
-"""
+# Модуль 2: Движок резолюций для логики предикатов
+# Реализует алгоритм резолюций с унификацией для поиска противоречия
 
 import re
 from typing import List, Dict, Tuple, Optional
 
 
+# Клауза (дизъюнкция литералов)
 class Clause:
-    """Представляет клаузу (дизъюнкцию литералов)."""
-    
     def __init__(self, literals: List[str]):
-        """
-        Args:
-            literals: Список литералов, например ['Человек(Сократ)', '¬Смертен(Сократ)']
-        """
         self.literals = literals
         self.normalized = self._normalize()
     
+    # Нормализация литералов в формат (is_negated, predicate, args)
     def _normalize(self) -> List[Tuple[bool, str, List[str]]]:
-        """
-        Нормализует литералы в формат (is_negated, predicate, args).
-        
-        Returns:
-            Список кортежей (is_negated, predicate_name, arguments)
-        """
         normalized = []
         for lit in self.literals:
             is_negated = lit.startswith('¬')
@@ -56,24 +43,19 @@ class Clause:
         return hash(tuple(sorted(self.literals)))
 
 
+# Подстановка переменных
 class Substitution:
-    """Представляет подстановку переменных."""
-    
     def __init__(self, mapping: Dict[str, str]):
-        """
-        Args:
-            mapping: Словарь {переменная: значение}, например {'x': 'Сократ'}
-        """
         self.mapping = mapping
     
+    # Применение подстановки к терму
     def apply(self, term: str) -> str:
-        """Применяет подстановку к терму."""
         if term in self.mapping:
             return self.mapping[term]
         return term
     
+    # Композиция подстановок
     def compose(self, other: 'Substitution') -> 'Substitution':
-        """Композиция подстановок."""
         new_mapping = {}
         # Применяем other к значениям self
         for var, value in self.mapping.items():
@@ -90,18 +72,8 @@ class Substitution:
         return "{" + ", ".join(f"{k}/{v}" for k, v in self.mapping.items()) + "}"
 
 
+# Унификация двух термов (списков аргументов)
 def unify(term1: List[str], term2: List[str], subst: Optional[Substitution] = None) -> Optional[Substitution]:
-    """
-    Унификация двух термов (списков аргументов).
-    
-    Args:
-        term1: Первый терм (список аргументов)
-        term2: Второй терм (список аргументов)
-        subst: Текущая подстановка (для рекурсии)
-    
-    Returns:
-        Подстановка, унифицирующая термы, или None если унификация невозможна
-    """
     if subst is None:
         subst = Substitution({})
     
@@ -136,18 +108,13 @@ def unify(term1: List[str], term2: List[str], subst: Optional[Substitution] = No
     return None
 
 
+# Проверка, является ли терм переменной (простая эвристика: одна буква x, y, z)
 def _is_variable(term: str) -> bool:
-    """Простая эвристика: переменная - это одна буква (x, y, z) или короткое имя."""
     return len(term) == 1 and term.islower() and term.isalpha()
 
 
+# Резолюция двух клауз
 def resolve(clause1: Clause, clause2: Clause) -> List[Tuple[Clause, Substitution, str, str]]:
-    """
-    Пытается выполнить резолюцию двух клауз.
-    
-    Returns:
-        Список кортежей (результирующая_клауза, подстановка, литерал1, литерал2)
-    """
     results = []
     
     for neg1, pred1, args1 in clause1.normalized:
@@ -198,17 +165,8 @@ def resolve(clause1: Clause, clause2: Clause) -> List[Tuple[Clause, Substitution
     return results
 
 
+# Выполнение алгоритма резолюций для поиска противоречия
 def resolution_proof(clauses: List[str]) -> Tuple[bool, List[str]]:
-    """
-    Выполняет алгоритм резолюций для поиска противоречия.
-    
-    Args:
-        clauses: Список формул в виде строк, например ['Человек(Сократ)', '¬Человек(x) ∨ Смертен(x)']
-    
-    Returns:
-        Кортеж (найдено_противоречие, лог_шагов)
-    """
-    # Парсим клаузы
     clause_objects = []
     for clause_str in clauses:
         # Разделяем по ∨ (с учетом пробелов)

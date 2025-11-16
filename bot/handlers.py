@@ -42,8 +42,8 @@ async def cmd_help(message: Message) -> None:
     await message.answer(text)
 
 
+# Периодическая отправка индикатора печати в чат
 async def _show_typing_indicator(bot: Bot, chat_id: int, stop_event: asyncio.Event) -> None:
-    """Периодически отправляет индикатор печати, пока не будет установлен stop_event."""
     while not stop_event.is_set():
         await bot.send_chat_action(chat_id, ChatAction.TYPING)
         try:
@@ -53,12 +53,8 @@ async def _show_typing_indicator(bot: Bot, chat_id: int, stop_event: asyncio.Eve
             continue
 
 
+# Форматирование результата полного пайплайна для отправки пользователю
 def _format_pipeline_result(result: dict) -> str:
-    """
-    Форматирует результат полного пайплайна для отправки пользователю.
-    
-    Формат A: один большой текст со всеми этапами.
-    """
     lines = []
     
     # Модуль 1: Формализация
@@ -97,10 +93,36 @@ async def handle_message(message: Message, bot: Bot) -> None:
     # Запускаем индикатор печати в фоне
     stop_typing = asyncio.Event()
     typing_task = asyncio.create_task(_show_typing_indicator(bot, message.chat.id, stop_typing))
+    
+    # Сообщения о прогрессе (будем обновлять одно сообщение)
+    progress_message = None
+    
+    # Callback для отправки промежуточных сообщений о прогрессе
+    async def progress_callback(text: str) -> None:
+        nonlocal progress_message
+        if progress_message is None:
+            progress_message = await message.answer(text)
+        else:
+            try:
+                await progress_message.edit_text(text)
+            except Exception:
+                # Если не удалось отредактировать (например, сообщение слишком старое), отправляем новое
+                progress_message = await message.answer(text)
 
     try:
-        result = await full_pipeline(user_text=user_text, user_id=str(message.from_user.id))
+        result = await full_pipeline(
+            user_text=user_text, 
+            user_id=str(message.from_user.id),
+            progress_callback=progress_callback
+        )
         formatted_result = _format_pipeline_result(result)
+        
+        # Удаляем сообщение о прогрессе перед отправкой результата
+        if progress_message:
+            try:
+                await progress_message.delete()
+            except Exception:
+                pass  # Игнорируем ошибки удаления
     except Exception as e:
         # Останавливаем индикатор печати
         stop_typing.set()
