@@ -1,0 +1,23 @@
+[project]
+name = "neuro-symbolic-reasoner"
+version = "0.1.0"
+description = "Simple Telegram bot using aiogram and OpenRouter LLM"
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram>=3.13.0",
+    "python-dotenv>=1.0.1",
+    "openai>=1.51.0",
+    "pytest>=8.3.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.setuptools]
+packages = ["bot", "llm"]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
