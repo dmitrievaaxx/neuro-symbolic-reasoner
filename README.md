@@ -1,5 +1,5 @@
-**Запуск**
-
+**Запуск**  
+[@LogiSolveBot](https://t.me/LogiSolveBot)
 1. Создать файл `.env` в корне проекта и указать:
 
 ```text
