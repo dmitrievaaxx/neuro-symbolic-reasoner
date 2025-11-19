@@ -18,6 +18,7 @@ python -m venv .venv
 ```
 4. Установить зависимости  
 ```
+pip install uv
 uv sync
 ```
 5. Запустить бота
