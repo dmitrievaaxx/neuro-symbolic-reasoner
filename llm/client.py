@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from typing import Callable, Awaitable, Any
 from functools import lru_cache
 
@@ -14,6 +16,9 @@ load_dotenv()
 MODELS = [
     "meta-llama/llama-3.3-70b-instruct:free",
     "deepseek/deepseek-r1-0528-qwen3-8b:free",
+    "openrouter/sherlock-dash-alpha",
+    "openrouter/sherlock-think-alpha",
+    "meituan/longcat-flash-chat:free"
 ]
 
 
@@ -101,15 +106,29 @@ async def _call_llm(system_prompt: str, user_text: str, user_id: str | None = No
 
 
 # Модуль 1: Формализатор - преобразует текст задачи в формулы логики предикатов
-async def module1_formalize(user_text: str, user_id: str | None = None) -> str:
+async def module1_formalize(user_text: str, user_id: str | None = None) -> list[str]:
     system_prompt = _get_prompt("formalizer")
-    return await _call_llm(system_prompt, user_text, user_id)
+    response = await _call_llm(system_prompt, user_text, user_id)
+    
+    # Парсим JSON ответ
+    try:
+        # Ищем JSON массив в ответе (на случай если LLM добавил текст до/после)
+        json_match = re.search(r'\[[\s\S]*\]', response)
+        if json_match:
+            json_str = json_match.group(0)
+            clauses = json.loads(json_str)
+            if isinstance(clauses, list) and all(isinstance(c, str) for c in clauses):
+                return clauses
+        
+        # Если не удалось распарсить JSON, возвращаем пустой список
+        raise ValueError(f"Не удалось распарсить JSON из ответа LLM: {response}")
+    except (json.JSONDecodeError, ValueError) as e:
+        raise RuntimeError(f"Ошибка парсинга формализованных клауз: {e}. Ответ LLM: {response}")
 
 
 # Модуль 2: Движок резолюций - выполняет алгоритм резолюций для поиска противоречия
-async def module2_resolve(formulas_str: str) -> tuple[bool, list[str]]:
-    formulas = [f.strip() for f in formulas_str.split(',') if f.strip()]
-    return resolution_proof(formulas)
+async def module2_resolve(clauses: list[str]) -> tuple[bool, list[str]]:
+    return resolution_proof(clauses)
 
 
 # Модуль 3: Объяснятор - преобразует формальный лог доказательства в понятное объяснение
@@ -140,7 +159,7 @@ async def full_pipeline(
     explanation = await module3_explain(proof_log, user_id)
     
     return {
-        'formalized': formalized,
+        'formalized': formalized,  # list[str]
         'proof_found': proof_found,
         'proof_log': proof_log,
         'explanation': explanation
