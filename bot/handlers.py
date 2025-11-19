@@ -59,7 +59,13 @@ def _format_pipeline_result(result: dict) -> str:
     
     # Модуль 1: Формализация
     lines.append("🔷 **Модуль 1 (Формализация):**")
-    lines.append(f"```\n{result['formalized']}\n```")
+    lines.append("")
+    # result['formalized'] теперь список строк - выводим построчно с номерами
+    clauses = result['formalized']
+    for i, clause in enumerate(clauses, 1):
+        lines.append(f"{i}. {clause}")
+    lines.append("")
+    lines.append(f"Всего клауз: {len(clauses)}")
     lines.append("")
     
     # Модуль 2: Доказательство
@@ -177,5 +183,3 @@ async def handle_message(message: Message, bot: Bot) -> None:
                 await message.answer(header + part, parse_mode="Markdown")
             else:
                 await message.answer(part, parse_mode="Markdown")
-
-
