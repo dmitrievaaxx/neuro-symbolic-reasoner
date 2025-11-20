@@ -175,8 +175,26 @@ def resolution_proof(clauses: List[str]) -> Tuple[bool, List[str]]:
     
     log = []
     log.append(f"Начальные клаузы: {len(clause_objects)}")
-    for i, clause in enumerate(clause_objects, 1):
-        log.append(f"  {i}. {clause}")
+    
+    clause_ids: Dict[Clause, int] = {}
+    next_clause_id = 1
+
+    def get_clause_id(clause: Clause) -> int:
+        nonlocal next_clause_id
+        if clause not in clause_ids:
+            clause_ids[clause] = next_clause_id
+            next_clause_id += 1
+        return clause_ids[clause]
+
+    def clause_to_str(clause: Clause) -> str:
+        return str(clause) if clause.literals else "Пустая клауза (⊥)"
+
+    def format_clause(clause: Clause) -> str:
+        clause_id = get_clause_id(clause)
+        return f"[#{clause_id}] {clause_to_str(clause)}"
+
+    for clause in clause_objects:
+        log.append(f"  {format_clause(clause)}")
     
     # Множество всех клауз (для отслеживания уже выведенных)
     all_clauses = set(clause_objects)
@@ -206,9 +224,10 @@ def resolution_proof(clauses: List[str]) -> Tuple[bool, List[str]]:
                     # Проверяем, не пустая ли клауза (противоречие!)
                     if not new_clause.literals:
                         log.append(f"\nШаг {step_num}: Противоречие найдено!")
-                        log.append(f"  Резолюция клауз '{clause1}' и '{clause2}'")
+                        log.append(f"  Клауза 1: {format_clause(clause1)}")
+                        log.append(f"  Клауза 2: {format_clause(clause2)}")
                         log.append(f"  Унификация {subst} в литералах '{lit1}' и '{lit2}'")
-                        log.append(f"  Результат: Пустая клауза (противоречие)")
+                        log.append(f"  Результат: {format_clause(new_clause)} (противоречие)")
                         return True, log
                     
                     # Если новая клауза еще не была выведена
@@ -216,10 +235,10 @@ def resolution_proof(clauses: List[str]) -> Tuple[bool, List[str]]:
                         all_clauses.add(new_clause)
                         new_clauses.add(new_clause)
                         log.append(f"\nШаг {step_num}: Резолюция")
-                        log.append(f"  Клауза 1: {clause1}")
-                        log.append(f"  Клауза 2: {clause2}")
+                        log.append(f"  Клауза 1: {format_clause(clause1)}")
+                        log.append(f"  Клауза 2: {format_clause(clause2)}")
                         log.append(f"  Унификация {subst} в литералах '{lit1}' и '{lit2}'")
-                        log.append(f"  Результат: {new_clause}")
+                        log.append(f"  Результат: {format_clause(new_clause)}")
                         step_num += 1
         
         # Если новых клауз не выведено, противоречия нет
