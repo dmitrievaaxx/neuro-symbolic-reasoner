@@ -53,37 +53,47 @@ async def _show_typing_indicator(bot: Bot, chat_id: int, stop_event: asyncio.Eve
             continue
 
 
+# Экранирование HTML-символов для безопасной отправки
+def _escape_html(text: str) -> str:
+    """Экранирует специальные символы HTML"""
+    return (text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;"))
+
 # Форматирование результата полного пайплайна для отправки пользователю
 def _format_pipeline_result(result: dict) -> str:
     lines = []
     
     # Модуль 1: Формализация
-    lines.append("🔷 **Модуль 1 (Формализация):**")
+    lines.append("🔷 <b>Модуль 1 (Формализация):</b>")
     lines.append("")
     # result['formalized'] теперь список строк - выводим построчно с номерами
     clauses = result['formalized']
     for i, clause in enumerate(clauses, 1):
-        lines.append(f"{i}. {clause}")
+        lines.append(f"{i}. {_escape_html(clause)}")
     lines.append("")
     lines.append(f"Всего клауз: {len(clauses)}")
     lines.append("")
     
     # Модуль 2: Доказательство
-    lines.append("🔷 **Модуль 2 (Движок резолюций):**")
+    lines.append("🔷 <b>Модуль 2 (Движок резолюций):</b>")
     if result['proof_found']:
         lines.append("✅ Противоречие найдено! Доказательство существует.")
     else:
         lines.append("❌ Противоречие не найдено. Доказательство не удалось построить.")
     lines.append("")
-    lines.append("**Лог шагов доказательства:**")
-    lines.append("```")
-    lines.extend(result['proof_log'])
-    lines.append("```")
+    lines.append("<b>Лог шагов доказательства:</b>")
+    lines.append("<pre>")
+    # Экранируем каждую строку лога
+    for log_line in result['proof_log']:
+        lines.append(_escape_html(log_line))
+    lines.append("</pre>")
     lines.append("")
     
     # Модуль 3: Объяснение
-    lines.append("🔷 **Модуль 3 (Объяснение):**")
-    lines.append(result['explanation'])
+    lines.append("🔷 <b>Модуль 3 (Объяснение):</b>")
+    lines.append(_escape_html(result['explanation']))
     
     return "\n".join(lines)
 
@@ -156,22 +166,43 @@ async def handle_message(message: Message, bot: Bot) -> None:
     # Если сообщение слишком длинное, разбиваем на части
     max_length = 4000  # Оставляем запас
     if len(formatted_result) <= max_length:
-        await message.answer(formatted_result, parse_mode="Markdown")
+        await message.answer(formatted_result, parse_mode="HTML")
     else:
-        # Разбиваем на части
+        # Разбиваем на части по строкам, стараясь не разрывать HTML-теги
         parts = []
         current_part = []
         current_length = 0
+        in_pre_tag = False  # Отслеживаем, находимся ли мы внутри <pre> тега
         
         for line in formatted_result.split('\n'):
             line_length = len(line) + 1  # +1 для \n
+            
+            # Если добавление этой строки превысит лимит
             if current_length + line_length > max_length and current_part:
+                # Если мы внутри <pre> блока, закрываем его перед разрывом
+                was_in_pre = in_pre_tag
+                if in_pre_tag:
+                    current_part.append("</pre>")
+                    in_pre_tag = False
+                
                 parts.append('\n'.join(current_part))
-                current_part = [line]
-                current_length = line_length
-            else:
-                current_part.append(line)
-                current_length += line_length
+                current_part = []
+                current_length = 0
+                
+                # Если мы были в <pre>, открываем его заново в новой части
+                if was_in_pre:
+                    current_part.append("<pre>")
+                    in_pre_tag = True
+                    current_length += len("<pre>") + 1
+            
+            # Проверяем, не начинается/заканчивается ли блок кода
+            if line.strip() == "<pre>":
+                in_pre_tag = True
+            elif line.strip() == "</pre>":
+                in_pre_tag = False
+            
+            current_part.append(line)
+            current_length += line_length
         
         if current_part:
             parts.append('\n'.join(current_part))
@@ -179,7 +210,7 @@ async def handle_message(message: Message, bot: Bot) -> None:
         # Отправляем части по очереди
         for i, part in enumerate(parts, 1):
             if len(parts) > 1:
-                header = f"**Часть {i} из {len(parts)}:**\n\n"
-                await message.answer(header + part, parse_mode="Markdown")
+                header = f"<b>Часть {i} из {len(parts)}:</b>\n\n"
+                await message.answer(header + part, parse_mode="HTML")
             else:
-                await message.answer(part, parse_mode="Markdown")
+                await message.answer(part, parse_mode="HTML")
