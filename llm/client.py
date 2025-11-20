@@ -14,8 +14,6 @@ load_dotenv()
 
 
 MODELS = [
-    "deepseek/deepseek-chat",
-    "deepseek/deepseek-chat-v3.1",
     "openai/gpt-5.1-chat",
     "meta-llama/llama-3.3-70b-instruct:free",
     "deepseek/deepseek-r1-0528-qwen3-8b:free",
