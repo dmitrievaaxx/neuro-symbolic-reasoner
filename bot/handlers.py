@@ -156,7 +156,7 @@ async def handle_message(message: Message, bot: Bot) -> None:
     # Если сообщение слишком длинное, разбиваем на части
     max_length = 4000  # Оставляем запас
     if len(formatted_result) <= max_length:
-        await message.answer(formatted_result, parse_mode="Markdown")
+        await message.answer(formatted_result, parse_mode="None")
     else:
         # Разбиваем на части
         parts = []
@@ -180,6 +180,6 @@ async def handle_message(message: Message, bot: Bot) -> None:
         for i, part in enumerate(parts, 1):
             if len(parts) > 1:
                 header = f"**Часть {i} из {len(parts)}:**\n\n"
-                await message.answer(header + part, parse_mode="Markdown")
+                await message.answer(header + part, parse_mode="None")
             else:
-                await message.answer(part, parse_mode="Markdown")
+                await message.answer(part, parse_mode="None")
