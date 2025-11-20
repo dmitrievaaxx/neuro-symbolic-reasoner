@@ -1,6 +1,8 @@
-**Запуск**  
-[@LogiSolveBot](https://t.me/LogiSolveBot)
+**Для пользователей:**
+[@LLM_Assistant_2bot](https://t.me//LLM_Assistant_2bot)
 
+
+**Для разработчиков**  
 1. Склонировать репозиторий и перейти в папку
 ```
 git clone https://github.com/dmitrievaaxx/neuro-symbolic-reasoner
