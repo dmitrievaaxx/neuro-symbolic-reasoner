@@ -5,15 +5,14 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Установка uv
-RUN pip install --no-cache-dir uv
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
 
-RUN uv sync --no-dev
+RUN pip install --no-cache-dir .
 
 COPY . .
 
 CMD ["python", "-m", "bot.main"]
-
-
